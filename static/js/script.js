@@ -1,4 +1,3 @@
-/* ================= GLOBAL INIT ================= */
 document.addEventListener("DOMContentLoaded", function () {
 
     console.log("🏥 HMS Loaded Successfully");
@@ -12,14 +11,14 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 
-/* ================= FLASH MESSAGE (FAST + SMOOTH) ================= */
+
 function handleFlashMessages() {
 
     let alerts = document.querySelectorAll('.alert');
 
     alerts.forEach(alert => {
 
-        // smooth fade
+       
         alert.style.transition = "opacity 0.3s ease";
 
         setTimeout(() => {
@@ -29,12 +28,12 @@ function handleFlashMessages() {
                 alert.remove();
             }, 300);
 
-        }, 1200); // 🔥 fast (1.2 sec)
+        }, 1200); 
     });
 }
 
 
-/* ================= FORM CONFIRMATION ================= */
+
 function handleFormConfirmation() {
 
     let forms = document.querySelectorAll("form");
@@ -52,7 +51,7 @@ function handleFormConfirmation() {
 }
 
 
-/* ================= TABLE ROW HOVER EFFECT ================= */
+
 function handleTableHover() {
 
     let rows = document.querySelectorAll("table tr");
@@ -69,7 +68,7 @@ function handleTableHover() {
 }
 
 
-/* ================= COUNTER ANIMATION ================= */
+
 function animateCounter(element, target) {
 
     let count = 0;
@@ -88,7 +87,7 @@ function animateCounter(element, target) {
 }
 
 
-/* ================= DASHBOARD COUNTERS ================= */
+
 function handleDashboardCounters() {
 
     let p = document.getElementById("patients");
@@ -101,7 +100,7 @@ function handleDashboardCounters() {
 }
 
 
-/* ================= CARD CLICK ANIMATION ================= */
+
 function handleCardClick() {
 
     let cards = document.querySelectorAll(".card");
