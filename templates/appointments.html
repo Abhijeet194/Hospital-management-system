@@ -37,6 +37,10 @@
                 {% if session.role == 'admin' %}
                 <th>Action</th>
                 {% endif %}
+
+                {% if session.role == 'doctor' %}
+                <th>Action</th>
+                {% endif %}
             </tr>
         </thead>
 
@@ -79,11 +83,15 @@
 
                
                 <td>
-                    {% if a[5] == 'Pending' %}
-                        <span class="badge bg-warning text-dark">⏳ Pending</span>
-                    {% else %}
-                        <span class="badge bg-success">✔ Confirmed</span>
-                    {% endif %}
+                 {% if a[5] == 'Pending' %}
+                     <span class="badge bg-warning text-dark">Pending</span>
+
+                {% elif a[5] == 'Confirmed' %}
+                    <span class="badge bg-success">Confirmed</span>
+
+                 {% elif a[5] == 'Completed' %}
+                    <span class="badge bg-primary">Completed</span>
+                 {% endif %}
                 </td>
 
                 
@@ -128,6 +136,23 @@
 
                 </td>
                 {% endif %}
+
+                {% if session.role == 'doctor' %}
+                <td>
+
+                 {% if a[5] == 'Confirmed' %}
+                    <form method="POST" action="/doctor/complete">
+                    <input type="hidden" name="id" value="{{ a[0] }}">
+                    <button class="btn btn-primary btn-sm w-100">
+                      ✔ Mark Done
+                    </button>
+                </form>
+                 {% else %}
+                <span class="text-muted">—</span>
+                 {% endif %}
+
+                </td>
+            {% endif %}
 
             </tr>
             {% endfor %}

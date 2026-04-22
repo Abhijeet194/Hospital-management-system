@@ -323,6 +323,57 @@ def confirm_appointment():
     return redirect('/appointments')
 
 
+@app.route('/add_doctor', methods=['POST'])
+@login_required('admin')
+def add_doctor():
+    name = request.form.get('name')
+    age = request.form.get('age')
+    gender = request.form.get('gender')
+    specialization = request.form.get('specialization')
+
+    username = request.form.get('username')
+    password = generate_password_hash(request.form.get('password'))
+
+    cur = mysql.connection.cursor()
+
+    # 1️⃣ Insert into doctors table
+    cur.execute("""
+        INSERT INTO doctors(name, age, gender, specialization)
+        VALUES(%s, %s, %s, %s)
+    """, (name, age, gender, specialization))
+
+    doctor_id = cur.lastrowid  # get inserted doctor ID
+
+    # 2️⃣ Create login in users table
+    cur.execute("""
+        INSERT INTO users(username, password, role, ref_id)
+        VALUES(%s, %s, 'doctor', %s)
+    """, (username, password, doctor_id))
+
+    mysql.connection.commit()
+    cur.close()
+
+    flash(f"Doctor added! Login username: {username}, password: 1234", "success")
+    return redirect('/doctors')
+
+@app.route('/doctor/complete', methods=['POST'])
+@login_required('doctor')
+def complete_appointment():
+    appointment_id = request.form.get('id')
+
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        UPDATE appointments
+        SET status = 'Completed'
+        WHERE id = %s
+    """, (appointment_id,))
+    mysql.connection.commit()
+    cur.close()
+
+    flash("Marked as completed!", "success")
+    return redirect('/appointments')
+
+
 @app.route('/logout')
 def logout():
     session.clear()
