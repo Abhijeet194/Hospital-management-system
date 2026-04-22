@@ -247,7 +247,7 @@ def appointments():
     role = session.get('role')
 
     query = """
-        SELECT a.id, p.name, d.name, a.date, a.disease, a.status, a.time, a.is_emergency
+        SELECT a.id, p.name, d.name, a.date, a.disease, a.status, a.time, a.is_emergency, a.mobile
         FROM appointments a
         JOIN patients p ON a.patient_id = p.id
         LEFT JOIN doctors d ON a.doctor_id = d.id
@@ -280,21 +280,23 @@ def patient_book():
     if request.method == 'POST':
         date = request.form.get('date')
         disease = request.form.get('disease')
+        mobile = request.form.get('mobile')
         patient_id = session['ref_id']
 
  
         is_emergency = 1 if request.form.get('emergency') else 0
 
      
-        if not date or not disease:
+        if not date or not disease or not mobile:
             flash("All fields are required!", "error")
             return redirect('/patient/book')
 
         cur = mysql.connection.cursor()
         cur.execute("""
-            INSERT INTO appointments(patient_id, date, disease, status, is_emergency)
-            VALUES(%s, %s, %s, 'Pending', %s)
-        """, (patient_id, date, disease, is_emergency))
+            INSERT INTO appointments(patient_id, date, disease, mobile, status, is_emergency)
+            VALUES(%s, %s, %s, %s, 'Pending', %s)
+        """, (patient_id, date, disease, mobile, is_emergency))
+
         mysql.connection.commit()
         cur.close()
 
@@ -336,15 +338,15 @@ def add_doctor():
 
     cur = mysql.connection.cursor()
 
-    # 1️⃣ Insert into doctors table
+    
     cur.execute("""
         INSERT INTO doctors(name, age, gender, specialization)
         VALUES(%s, %s, %s, %s)
     """, (name, age, gender, specialization))
 
-    doctor_id = cur.lastrowid  # get inserted doctor ID
+    doctor_id = cur.lastrowid  
 
-    # 2️⃣ Create login in users table
+   
     cur.execute("""
         INSERT INTO users(username, password, role, ref_id)
         VALUES(%s, %s, 'doctor', %s)
@@ -371,6 +373,118 @@ def complete_appointment():
     cur.close()
 
     flash("Marked as completed!", "success")
+    return redirect('/appointments')
+
+@app.route('/patient/cancel', methods=['POST'])
+@login_required('patient')
+def cancel_appointment():
+    appointment_id = request.form.get('id')
+    patient_id = session.get('ref_id')
+
+    cur = mysql.connection.cursor()
+
+    
+    cur.execute("""
+        DELETE FROM appointments
+        WHERE id = %s AND patient_id = %s AND status = 'Pending'
+    """, (appointment_id, patient_id))
+
+    mysql.connection.commit()
+    cur.close()
+
+    flash("Appointment cancelled!", "success")
+    return redirect('/appointments')
+
+@app.route('/delete_doctor/<int:id>')
+@login_required('admin')
+def delete_doctor(id):
+    cur = mysql.connection.cursor()
+    cur.execute("DELETE FROM doctors WHERE id=%s", (id,))
+    mysql.connection.commit()
+    cur.close()
+
+    flash("Doctor deleted successfully!", "success")
+    return redirect('/doctors')
+
+@app.route('/update_doctor/<int:id>', methods=['GET', 'POST'])
+@login_required('admin')
+def update_doctor(id):
+    cur = mysql.connection.cursor()
+
+    if request.method == 'POST':
+        name = request.form.get('name')
+        specialization = request.form.get('specialization')
+        age = request.form.get('age')
+        gender = request.form.get('gender')
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        
+        age = int(age) if age else None
+
+        
+        cur.execute("""
+            UPDATE doctors
+            SET name=%s, specialization=%s, age=%s, gender=%s
+            WHERE id=%s
+        """, (name, specialization, age, gender, id))
+
+        
+        if password:
+            hashed_password = generate_password_hash(password)
+            cur.execute("""
+                UPDATE users
+                SET username=%s, password=%s
+                WHERE ref_id=%s AND role='doctor'
+            """, (username, hashed_password, id))
+        else:
+            cur.execute("""
+                UPDATE users
+                SET username=%s
+                WHERE ref_id=%s AND role='doctor'
+            """, (username, id))
+
+        mysql.connection.commit()
+        cur.close()
+
+        flash("Doctor updated successfully!", "success")
+        return redirect('/doctors')
+
+    
+    cur.execute("SELECT * FROM doctors WHERE id=%s", (id,))
+    doctor = cur.fetchone()
+
+    cur.execute("SELECT username FROM users WHERE ref_id=%s AND role='doctor'", (id,))
+    user = cur.fetchone()
+
+    cur.close()
+
+    return render_template('update_doctor.html', doctor=doctor, user=user)
+
+@app.route('/delete_patient/<int:id>')
+@login_required('admin')
+def delete_patient(id):
+    cur = mysql.connection.cursor()
+
+    cur.execute("DELETE FROM patients WHERE id=%s", (id,))
+    mysql.connection.commit()
+
+    cur.close()
+
+    flash("Patient deleted successfully!", "success")
+    return redirect('/patients')
+
+@app.route('/admin/delete_appointment', methods=['POST'])
+@login_required('admin')
+def delete_appointment():
+    appointment_id = request.form.get('id')
+
+    cur = mysql.connection.cursor()
+    cur.execute("DELETE FROM appointments WHERE id=%s", (appointment_id,))
+    mysql.connection.commit()
+    cur.close()
+
+    flash("Appointment deleted successfully!", "success")
     return redirect('/appointments')
 
 
