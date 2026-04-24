@@ -12,7 +12,7 @@ app.secret_key = "supersecretkey"
 
 def get_db():
     return pymysql.connect(
-        host=os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or 'localhost',
+        host=os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or '127.0.0.1',
         user=os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or 'root',
         password=os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or 'password',
         database=os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DB') or 'hospital_db',
