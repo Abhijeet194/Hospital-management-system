@@ -1,19 +1,25 @@
 from flask import Flask, render_template, request, redirect, flash, session
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_mysqldb import MySQL
-from datetime import datetime, timedelta
+import pymysql
+import os
+from datetime import timedelta
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key_here"
+app.secret_key = "supersecretkey"
 
 
-app.config['MYSQL_HOST'] = '127.0.0.1'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'password'
-app.config['MYSQL_DB'] = 'hospital_db'
 
-mysql = MySQL(app)
+def get_db():
+    return pymysql.connect(
+        host=os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or 'localhost',
+        user=os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or 'root',
+        password=os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or 'password',
+        database=os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DB') or 'hospital_db',
+        port=int(os.getenv('MYSQLPORT') or os.getenv('MYSQL_PORT') or 3306),
+        cursorclass=pymysql.cursors.Cursor
+    )
+
 
 
 def login_required(role=None):
@@ -56,7 +62,6 @@ def format_time_12h(value):
         return str(value)
 
 
-
 @app.route('/')
 def home():
     return redirect('/login')
@@ -81,18 +86,17 @@ def patient_register():
             flash("Name, Username and Password are required!", "error")
             return redirect('/patient/register')
 
-        cur = mysql.connection.cursor()
+        conn = get_db()
+        cur = conn.cursor()
 
-       
         cur.execute(
             "INSERT INTO patients(name, age, gender) VALUES(%s,%s,%s)",
             (name, age, gender)
         )
-        mysql.connection.commit()
+        conn.commit()
 
         patient_id = cur.lastrowid
 
-        
         hashed_password = generate_password_hash(password)
 
         cur.execute(
@@ -100,14 +104,13 @@ def patient_register():
             (username, hashed_password, 'patient', patient_id)
         )
 
-        mysql.connection.commit()
-        cur.close()
+        conn.commit()
+        conn.close()
 
         flash("Registration successful! Please login.", "success")
         return redirect('/patient/login')
 
     return render_template('patient_register.html')
-
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -116,10 +119,14 @@ def admin_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT id, username, password FROM users WHERE username=%s AND role='admin'", (username,))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, username, password FROM users WHERE username=%s AND role='admin'",
+            (username,)
+        )
         user = cur.fetchone()
-        cur.close()
+        conn.close()
 
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
@@ -129,7 +136,13 @@ def admin_login():
 
         flash("Invalid admin credentials!")
 
-    return render_template('base_login.html', title="Admin Login")
+    return render_template(
+        'base_login.html',
+        title="Admin Login",
+        heading="Admin Login",
+        action_url="/admin/login",
+        btn_class="btn-primary"
+    )
 
 
 @app.route('/doctor/login', methods=['GET', 'POST'])
@@ -138,10 +151,14 @@ def doctor_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='doctor'", (username,))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='doctor'",
+            (username,)
+        )
         user = cur.fetchone()
-        cur.close()
+        conn.close()
 
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
@@ -152,8 +169,13 @@ def doctor_login():
 
         flash("Invalid doctor credentials!")
 
-    return render_template('base_login.html', title="Doctor Login")
-
+    return render_template(
+        'base_login.html',
+        title="Doctor Login",
+        heading="Doctor Login",
+        action_url="/doctor/login",
+        btn_class="btn-success"
+    )
 
 
 @app.route('/patient/login', methods=['GET', 'POST'])
@@ -162,10 +184,14 @@ def patient_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='patient'", (username,))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='patient'",
+            (username,)
+        )
         user = cur.fetchone()
-        cur.close()
+        conn.close()
 
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]
@@ -176,27 +202,32 @@ def patient_login():
 
         flash("Invalid patient credentials!")
 
-    return render_template('base_login.html', title="Patient Login")
+    return render_template(
+        'base_login.html',
+        title="Patient Login",
+        heading="Patient Login",
+        action_url="/patient/login",
+        btn_class="btn-info"
+    )
 
 
 @app.route('/admin/dashboard')
 @login_required('admin')
 def admin_dashboard():
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
     cur.execute("SELECT COUNT(*) FROM patients")
     total_patients = cur.fetchone()[0]
 
-  
     cur.execute("SELECT COUNT(*) FROM doctors")
     total_doctors = cur.fetchone()[0]
 
-   
     cur.execute("SELECT COUNT(*) FROM appointments")
     total_appointments = cur.fetchone()[0]
 
-    cur.close()
+    conn.close()
 
     return render_template(
         'admin_dashboard.html',
@@ -218,32 +249,33 @@ def patient_dashboard():
     return render_template('patient_dashboard.html')
 
 
-
 @app.route('/patients')
 @login_required('admin')
 def patients():
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("SELECT id, name, age, gender, disease FROM patients")
     data = cur.fetchall()
-    cur.close()
+    conn.close()
     return render_template('patients.html', patients=data)
 
 
 @app.route('/doctors')
 @login_required('admin')
 def doctors():
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("SELECT id, name, age, gender, specialization FROM doctors")
     data = cur.fetchall()
-    cur.close()
+    conn.close()
     return render_template('doctors.html', doctors=data)
-
 
 
 @app.route('/appointments')
 @login_required()
 def appointments():
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     role = session.get('role')
 
     query = """
@@ -255,15 +287,13 @@ def appointments():
 
     if role == 'patient':
         cur.execute(query + " WHERE a.patient_id = %s ORDER BY a.is_emergency DESC, a.date ASC", (session['ref_id'],))
-
     elif role == 'doctor':
-         cur.execute(query + " WHERE a.doctor_id = %s ORDER BY a.is_emergency DESC, a.date ASC", (session['ref_id'],))
-
+        cur.execute(query + " WHERE a.doctor_id = %s ORDER BY a.is_emergency DESC, a.date ASC", (session['ref_id'],))
     else:
         cur.execute(query + " ORDER BY a.is_emergency DESC, a.date ASC")
 
     rows = cur.fetchall()
-    cur.close()
+    conn.close()
 
     data = []
     for r in rows:
@@ -283,22 +313,21 @@ def patient_book():
         mobile = request.form.get('mobile')
         patient_id = session['ref_id']
 
- 
         is_emergency = 1 if request.form.get('emergency') else 0
 
-     
         if not date or not disease or not mobile:
             flash("All fields are required!", "error")
             return redirect('/patient/book')
 
-        cur = mysql.connection.cursor()
+        conn = get_db()
+        cur = conn.cursor()
         cur.execute("""
             INSERT INTO appointments(patient_id, date, disease, mobile, status, is_emergency)
             VALUES(%s, %s, %s, %s, 'Pending', %s)
         """, (patient_id, date, disease, mobile, is_emergency))
 
-        mysql.connection.commit()
-        cur.close()
+        conn.commit()
+        conn.close()
 
         flash("Appointment booked successfully!", "success")
         return redirect('/appointments')
@@ -313,14 +342,15 @@ def confirm_appointment():
     doctor_id = request.form.get('doctor_id')
     time = request.form.get('time')
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("""
         UPDATE appointments
         SET doctor_id=%s, time=%s, status='Confirmed'
         WHERE id=%s
     """, (doctor_id, time, appointment_id))
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     return redirect('/appointments')
 
@@ -336,44 +366,46 @@ def add_doctor():
     username = request.form.get('username')
     password = generate_password_hash(request.form.get('password'))
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
-    
     cur.execute("""
         INSERT INTO doctors(name, age, gender, specialization)
         VALUES(%s, %s, %s, %s)
     """, (name, age, gender, specialization))
 
-    doctor_id = cur.lastrowid  
+    doctor_id = cur.lastrowid
 
-   
     cur.execute("""
         INSERT INTO users(username, password, role, ref_id)
         VALUES(%s, %s, 'doctor', %s)
     """, (username, password, doctor_id))
 
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash(f"Doctor added! Login username: {username}, password: 1234", "success")
     return redirect('/doctors')
+
 
 @app.route('/doctor/complete', methods=['POST'])
 @login_required('doctor')
 def complete_appointment():
     appointment_id = request.form.get('id')
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("""
         UPDATE appointments
         SET status = 'Completed'
         WHERE id = %s
     """, (appointment_id,))
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash("Marked as completed!", "success")
     return redirect('/appointments')
+
 
 @app.route('/patient/cancel', methods=['POST'])
 @login_required('patient')
@@ -381,35 +413,39 @@ def cancel_appointment():
     appointment_id = request.form.get('id')
     patient_id = session.get('ref_id')
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
-    
     cur.execute("""
         DELETE FROM appointments
         WHERE id = %s AND patient_id = %s AND status = 'Pending'
     """, (appointment_id, patient_id))
 
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash("Appointment cancelled!", "success")
     return redirect('/appointments')
 
+
 @app.route('/delete_doctor/<int:id>')
 @login_required('admin')
 def delete_doctor(id):
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("DELETE FROM doctors WHERE id=%s", (id,))
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash("Doctor deleted successfully!", "success")
     return redirect('/doctors')
 
+
 @app.route('/update_doctor/<int:id>', methods=['GET', 'POST'])
 @login_required('admin')
 def update_doctor(id):
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
     if request.method == 'POST':
         name = request.form.get('name')
@@ -419,17 +455,14 @@ def update_doctor(id):
         username = request.form.get('username')
         password = request.form.get('password')
 
-        
         age = int(age) if age else None
 
-        
         cur.execute("""
             UPDATE doctors
             SET name=%s, specialization=%s, age=%s, gender=%s
             WHERE id=%s
         """, (name, specialization, age, gender, id))
 
-        
         if password:
             hashed_password = generate_password_hash(password)
             cur.execute("""
@@ -444,45 +477,47 @@ def update_doctor(id):
                 WHERE ref_id=%s AND role='doctor'
             """, (username, id))
 
-        mysql.connection.commit()
-        cur.close()
+        conn.commit()
+        conn.close()
 
         flash("Doctor updated successfully!", "success")
         return redirect('/doctors')
 
-    
     cur.execute("SELECT * FROM doctors WHERE id=%s", (id,))
     doctor = cur.fetchone()
 
     cur.execute("SELECT username FROM users WHERE ref_id=%s AND role='doctor'", (id,))
     user = cur.fetchone()
 
-    cur.close()
+    conn.close()
 
     return render_template('update_doctor.html', doctor=doctor, user=user)
+
 
 @app.route('/delete_patient/<int:id>')
 @login_required('admin')
 def delete_patient(id):
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
     cur.execute("DELETE FROM patients WHERE id=%s", (id,))
-    mysql.connection.commit()
-
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash("Patient deleted successfully!", "success")
     return redirect('/patients')
+
 
 @app.route('/admin/delete_appointment', methods=['POST'])
 @login_required('admin')
 def delete_appointment():
     appointment_id = request.form.get('id')
 
-    cur = mysql.connection.cursor()
+    conn = get_db()
+    cur = conn.cursor()
     cur.execute("DELETE FROM appointments WHERE id=%s", (appointment_id,))
-    mysql.connection.commit()
-    cur.close()
+    conn.commit()
+    conn.close()
 
     flash("Appointment deleted successfully!", "success")
     return redirect('/appointments')
@@ -494,6 +529,5 @@ def logout():
     return redirect('/login')
 
 
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)), debug=True)
