@@ -12,7 +12,6 @@
     --radius: 18px;
 }
 
-
 * {
     box-sizing: border-box;
 }
@@ -36,7 +35,6 @@ body {
     font-weight: 600;
 }
 
-
 .card {
     border: none;
     border-radius: var(--radius);
@@ -47,7 +45,6 @@ body {
 .card:hover {
     transform: translateY(-5px);
 }
-
 
 .table {
     border-radius: 15px;
@@ -63,7 +60,6 @@ body {
     text-align: center;
     vertical-align: middle;
 }
-
 
 .btn {
     border-radius: 10px;
@@ -88,7 +84,6 @@ body {
     color: white;
 }
 
-
 .form-control, .form-select {
     border-radius: 10px;
 }
@@ -97,7 +92,6 @@ body {
     border-color: var(--primary);
     box-shadow: 0 0 6px rgba(13,110,253,0.4);
 }
-
 
 .dashboard {
     display: grid;
@@ -117,114 +111,328 @@ body {
 }
 
 
+
 .login-page {
     min-height: 100vh;
     background:
-        linear-gradient(rgba(10, 25, 47, 0.20), rgba(10, 25, 47, 0.00)),
+        linear-gradient(rgba(10, 25, 47, 0.10), rgba(10, 25, 47, 0.00)),
         url("../images/hospital-bg.jpg") center/cover no-repeat;
 }
-
 
 .login-overlay {
     min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
+    padding: 24px 16px;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 860px;
+    background: rgba(10, 20, 38, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
 }
 
 
-.login-box {
-    width: 100%;
-    max-width: 1000px;
+.login-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
 
-    background: rgba(255, 255, 255, 0.18); 
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+.login-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-    border-radius: 25px;
-    border: 1px solid rgba(255,255,255,0.25);
+.login-logo-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: #1d6fa4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 17px;
+    font-weight: 700;
+}
 
-    box-shadow: 0 30px 70px rgba(0,0,0,0.35);
+.login-logo-name {
+    color: #e2e8f0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+}
 
-    padding: 40px 25px;
+.login-logo-sub {
+    color: #cbd5e1;
+    font-size: 11px;
+}
+
+.login-status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 20px;
+    padding: 5px 12px;
+    color: #34d399;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.login-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #34d399;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+
+.login-hero {
+    padding: 28px 24px 20px;
+}
+
+.login-secure-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(29, 111, 164, 0.15);
+    border: 1px solid rgba(29, 111, 164, 0.3);
+    border-radius: 20px;
+    padding: 5px 14px;
+    color: #7dd3fc;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.login-title {
+    color: #f1f5f9;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.login-subtitle {
+    color: #94a3b8;
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+
+.login-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 4px;
+}
+
+.login-stat {
     text-align: center;
 }
 
-
-.login-box h2 {
-    color: #ffffff;
-    font-weight: 800;
+.login-stat-num {
+    color: #f1f5f9;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
-.login-box p {
-    color: rgba(255,255,255,0.85);
+.login-stat-label {
+    color: #94a3b8;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+}
+
+.login-stat-sep {
+    width: 1px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.18);
 }
 
 
-.role-card {
-    background: rgba(255,255,255,0.85); 
-    border-radius: 20px;
-    padding: 25px;
-
-    transition: 0.3s;
-    border: none;
-
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+.login-cards-row {
+    padding: 16px 20px;
 }
 
-.role-card:hover {
-    transform: translateY(-10px) scale(1.03);
-    box-shadow: 0 20px 45px rgba(0,0,0,0.3);
+.role-card-modern {
+    background: rgba(15, 30, 52, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+    padding: 18px 16px 16px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: border-color 0.25s, background 0.25s, transform 0.25s;
 }
 
-.role-icon {
-    font-size: 40px;
+.role-card-modern:hover {
+    background: rgba(20, 38, 64, 0.95);
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: translateY(-4px);
+}
+
+.role-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.role-icon-modern {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.admin-icon  { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
+.doctor-icon { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+.patient-icon{ background: rgba(29, 111, 164, 0.15); color: #7dd3fc; }
+
+.role-arrow {
+    color: #334155;
+    font-size: 14px;
+    transition: color 0.2s, transform 0.2s;
+}
+
+.role-card-modern:hover .role-arrow {
+    color: #64748b;
+    transform: translateX(3px);
+}
+
+.role-accent-bar {
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
     margin-bottom: 10px;
 }
 
-.role-card h5 {
-    color: #1f3b57;
-    font-weight: 700;
-}
+.admin-bar   { background: #6366f1; }
+.doctor-bar  { background: #10b981; }
+.patient-bar { background: #1d6fa4; }
 
-.role-card p {
-    color: #6b7a90;
-}
-
-
-.register-link {
-    display: block;
-    margin-top: 10px;
-    color: #0d6efd;
+.role-card-title {
+    color: #e2e8f0;
+    font-size: 15px;
     font-weight: 600;
+    margin-bottom: 6px;
 }
 
-.register-link:hover {
-    color: #0a58ca;
+.role-card-desc {
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.6;
+    flex: 1;
+    margin-bottom: 16px;
+}
+
+.role-btn {
+    padding: 9px 0;
+    border-radius: 9px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.01em;
+    transition: opacity 0.2s, transform 0.2s;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+}
+
+.role-btn:hover {
+    opacity: 0.88;
+    transform: translateY(-1px) scale(1.01);
+    color: #fff;
+}
+
+.admin-btn   { background: #6366f1; }
+.doctor-btn  { background: #10b981; }
+.patient-btn { background: #1d6fa4; }
+
+.role-btn-outline {
+    padding: 8px 0;
+    border-radius: 9px;
+    border: 1px solid rgba(29, 111, 164, 0.4);
+    background: transparent;
+    color: #7dd3fc;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.2s;
+    text-decoration: none;
+    display: block;
+    text-align: center;
+}
+
+.role-btn-outline:hover {
+    background: rgba(29, 111, 164, 0.12);
+    color: #93c5fd;
+    transform: translateY(-1px);
 }
 
 
-.hospital-badge {
-    display: inline-block;
-    padding: 10px 20px;
-    border-radius: 999px;
-
-    background: linear-gradient(135deg, #0d6efd, #198754);
-
-    color: white;
-    font-weight: 700;
-    font-size: 0.95rem;
-
-    border: 1px solid rgba(255,255,255,0.25);
-
-    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+.login-footer-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 12px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.login-footer-item {
+    color: #94a3b8;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.login-footer-item i {
+    font-size: 12px;
+}
 
 @media (max-width: 768px) {
-    .login-box {
-        padding: 25px;
+    .login-topbar {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .login-stats {
+        gap: 16px;
+    }
+
+    .login-footer-strip {
+        flex-wrap: wrap;
+        gap: 12px;
     }
 
     .dashboard {
@@ -236,3 +444,6 @@ body {
     background: linear-gradient(135deg, #dc3545, #a71d2a);
     font-weight: bold;
 }
+
+
+
