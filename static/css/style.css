@@ -120,7 +120,7 @@ body {
 .login-page {
     min-height: 100vh;
     background:
-        linear-gradient(rgba(10, 25, 47, 0.45), rgba(10, 25, 47, 0.45)),
+        linear-gradient(rgba(10, 25, 47, 0.20), rgba(10, 25, 47, 0.00)),
         url("../images/hospital-bg.jpg") center/cover no-repeat;
 }
 
