@@ -12,9 +12,12 @@ app.secret_key = "supersecretkey"
 
 
 def get_db():
-    conn = psycopg2.connect(
-        os.environ.get("DATABASE_URL")
-    )
+    uri = os.environ.get("DATABASE_URL")
+
+    if uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql://", 1)
+
+    conn = psycopg2.connect(uri)
     conn.autocommit = True
     return conn
 
