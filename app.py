@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, flash, session
 from werkzeug.security import check_password_hash, generate_password_hash
-import pymysql
+import psycopg2.extras
+import psycopg2
 import os
 from datetime import timedelta
 from functools import wraps
@@ -11,15 +12,11 @@ app.secret_key = "supersecretkey"
 
 
 def get_db():
-    return pymysql.connect(
-        host=os.getenv('MYSQLHOST') or os.getenv('MYSQL_HOST') or '127.0.0.1',
-        user=os.getenv('MYSQLUSER') or os.getenv('MYSQL_USER') or 'root',
-        password=os.getenv('MYSQLPASSWORD') or os.getenv('MYSQL_PASSWORD') or 'password',
-        database=os.getenv('MYSQLDATABASE') or os.getenv('MYSQL_DB') or 'hospital_db',
-        port=int(os.getenv('MYSQLPORT') or os.getenv('MYSQL_PORT') or 3306),
-        cursorclass=pymysql.cursors.Cursor
+    conn = psycopg2.connect(
+        os.environ.get("DATABASE_URL")
     )
-
+    conn.autocommit = True
+    return conn
 
 
 def login_required(role=None):
@@ -87,7 +84,7 @@ def patient_register():
             return redirect('/patient/register')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         cur.execute(
             "INSERT INTO patients(name, age, gender) VALUES(%s,%s,%s)",
@@ -120,7 +117,7 @@ def admin_login():
         password = request.form.get('password')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, username, password FROM users WHERE username=%s AND role='admin'",
             (username,)
@@ -128,9 +125,9 @@ def admin_login():
         user = cur.fetchone()
         conn.close()
 
-        if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['username'] = user[1]
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
             session['role'] = 'admin'
             return redirect('/admin/dashboard')
 
@@ -152,7 +149,7 @@ def doctor_login():
         password = request.form.get('password')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='doctor'",
             (username,)
@@ -160,11 +157,11 @@ def doctor_login():
         user = cur.fetchone()
         conn.close()
 
-        if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['username'] = user[1]
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
             session['role'] = 'doctor'
-            session['ref_id'] = user[3]
+            session['ref_id'] = user['ref_id']
             return redirect('/doctor/dashboard')
 
         flash("Invalid doctor credentials!")
@@ -185,7 +182,7 @@ def patient_login():
         password = request.form.get('password')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='patient'",
             (username,)
@@ -193,11 +190,11 @@ def patient_login():
         user = cur.fetchone()
         conn.close()
 
-        if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['username'] = user[1]
+        if user and check_password_hash(user['password'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
             session['role'] = 'patient'
-            session['ref_id'] = user[3]
+            session['ref_id'] = user['ref_id']
             return redirect('/patient/dashboard')
 
         flash("Invalid patient credentials!")
@@ -216,7 +213,7 @@ def patient_login():
 def admin_dashboard():
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("SELECT COUNT(*) FROM patients")
     total_patients = cur.fetchone()[0]
@@ -253,7 +250,7 @@ def patient_dashboard():
 @login_required('admin')
 def patients():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("SELECT id, name, age, gender, disease FROM patients")
     data = cur.fetchall()
     conn.close()
@@ -264,7 +261,7 @@ def patients():
 @login_required('admin')
 def doctors():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("SELECT id, name, age, gender, specialization FROM doctors")
     data = cur.fetchall()
     conn.close()
@@ -275,7 +272,7 @@ def doctors():
 @login_required()
 def appointments():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     role = session.get('role')
 
     query = """
@@ -320,7 +317,7 @@ def patient_book():
             return redirect('/patient/book')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             INSERT INTO appointments(patient_id, date, disease, mobile, status, is_emergency)
             VALUES(%s, %s, %s, %s, 'Pending', %s)
@@ -343,7 +340,7 @@ def confirm_appointment():
     time = request.form.get('time')
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("""
         UPDATE appointments
         SET doctor_id=%s, time=%s, status='Confirmed'
@@ -367,7 +364,7 @@ def add_doctor():
     password = generate_password_hash(request.form.get('password'))
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("""
         INSERT INTO doctors(name, age, gender, specialization)
@@ -394,7 +391,7 @@ def complete_appointment():
     appointment_id = request.form.get('id')
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("""
         UPDATE appointments
         SET status = 'Completed'
@@ -414,7 +411,7 @@ def cancel_appointment():
     patient_id = session.get('ref_id')
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("""
         DELETE FROM appointments
@@ -432,7 +429,7 @@ def cancel_appointment():
 @login_required('admin')
 def delete_doctor(id):
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("DELETE FROM doctors WHERE id=%s", (id,))
     conn.commit()
     conn.close()
@@ -445,7 +442,7 @@ def delete_doctor(id):
 @login_required('admin')
 def update_doctor(id):
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     if request.method == 'POST':
         name = request.form.get('name')
@@ -498,7 +495,7 @@ def update_doctor(id):
 @login_required('admin')
 def delete_patient(id):
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     cur.execute("DELETE FROM patients WHERE id=%s", (id,))
     conn.commit()
@@ -514,7 +511,7 @@ def delete_appointment():
     appointment_id = request.form.get('id')
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("DELETE FROM appointments WHERE id=%s", (appointment_id,))
     conn.commit()
     conn.close()
