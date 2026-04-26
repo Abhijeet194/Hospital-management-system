@@ -1,25 +1,39 @@
 from flask import Flask, render_template, request, redirect, flash, session
-from werkzeug.security import check_password_hash, generate_password_hash
-import psycopg.rows
-import psycopg
-import os
-from datetime import timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timedelta
 from functools import wraps
+from sqlalchemy import text
+import os
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
 
 
+app.secret_key = os.getenv("abhi@995545", "dev-secret-key")
 
-def get_db():
-    uri = os.environ.get("DATABASE_URL")
 
-    if uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+    'DATABASE_URL',
+    'mysql+pymysql://root:password@127.0.0.1:3306/hospital_db?charset=utf8mb4'
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    conn = psycopg.connect(uri)
-    conn.autocommit = True
-    return conn
+db = SQLAlchemy(app)
+
+
+def db_fetchone(query, params=None):
+    result = db.session.execute(text(query), params or {})
+    return result.fetchone()
+
+
+def db_fetchall(query, params=None):
+    result = db.session.execute(text(query), params or {})
+    return result.fetchall()
+
+
+def db_execute(query, params=None):
+    db.session.execute(text(query), params or {})
+    db.session.commit()
 
 
 def login_required(role=None):
@@ -35,7 +49,6 @@ def login_required(role=None):
             return func(*args, **kwargs)
         return wrapper
     return decorator
-
 
 
 def format_time_12h(value):
@@ -74,7 +87,6 @@ def login():
 
 @app.route('/patient/register', methods=['GET', 'POST'])
 def patient_register():
-
     if request.method == 'POST':
         name = request.form.get('name')
         age = request.form.get('age')
@@ -86,29 +98,35 @@ def patient_register():
             flash("Name, Username and Password are required!", "error")
             return redirect('/patient/register')
 
-        conn = get_db()
-        cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-
-        cur.execute(
-            "INSERT INTO patients(name, age, gender) VALUES(%s,%s,%s)",
-            (name, age, gender)
-        )
-        conn.commit()
-
-        patient_id = cur.lastrowid
-
         hashed_password = generate_password_hash(password)
 
-        cur.execute(
-            "INSERT INTO users(username, password, role, ref_id) VALUES(%s,%s,%s,%s)",
-            (username, hashed_password, 'patient', patient_id)
-        )
+        try:
+            db.session.execute(
+                text("""
+                    INSERT INTO patients(name, age, gender)
+                    VALUES(:name, :age, :gender)
+                """),
+                {"name": name, "age": age, "gender": gender}
+            )
 
-        conn.commit()
-        conn.close()
+            patient_id = db.session.execute(text("SELECT LAST_INSERT_ID()")).scalar_one()
 
-        flash("Registration successful! Please login.", "success")
-        return redirect('/patient/login')
+            db.session.execute(
+                text("""
+                    INSERT INTO users(username, password, role, ref_id)
+                    VALUES(:username, :password, 'patient', :ref_id)
+                """),
+                {"username": username, "password": hashed_password, "ref_id": patient_id}
+            )
+
+            db.session.commit()
+            flash("Registration successful! Please login.", "success")
+            return redirect('/patient/login')
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Registration failed: {e}", "error")
+            return redirect('/patient/register')
 
     return render_template('patient_register.html')
 
@@ -119,18 +137,14 @@ def admin_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        conn = get_db()
-        cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-        cur.execute(
-            "SELECT id, username, password FROM users WHERE username=%s AND role='admin'",
-            (username,)
+        user = db_fetchone(
+            "SELECT id, username, password FROM users WHERE username=:username AND role='admin'",
+            {"username": username}
         )
-        user = cur.fetchone()
-        conn.close()
 
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
+        if user and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['username'] = user[1]
             session['role'] = 'admin'
             return redirect('/admin/dashboard')
 
@@ -151,20 +165,16 @@ def doctor_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        conn = get_db()
-        cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-        cur.execute(
-            "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='doctor'",
-            (username,)
+        user = db_fetchone(
+            "SELECT id, username, password, ref_id FROM users WHERE username=:username AND role='doctor'",
+            {"username": username}
         )
-        user = cur.fetchone()
-        conn.close()
 
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
+        if user and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['username'] = user[1]
             session['role'] = 'doctor'
-            session['ref_id'] = user['ref_id']
+            session['ref_id'] = user[3]
             return redirect('/doctor/dashboard')
 
         flash("Invalid doctor credentials!")
@@ -184,20 +194,16 @@ def patient_login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        conn = get_db()
-        cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-        cur.execute(
-            "SELECT id, username, password, ref_id FROM users WHERE username=%s AND role='patient'",
-            (username,)
+        user = db_fetchone(
+            "SELECT id, username, password, ref_id FROM users WHERE username=:username AND role='patient'",
+            {"username": username}
         )
-        user = cur.fetchone()
-        conn.close()
 
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = user['id']
-            session['username'] = user['username']
+        if user and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['username'] = user[1]
             session['role'] = 'patient'
-            session['ref_id'] = user['ref_id']
+            session['ref_id'] = user[3]
             return redirect('/patient/dashboard')
 
         flash("Invalid patient credentials!")
@@ -214,20 +220,9 @@ def patient_login():
 @app.route('/admin/dashboard')
 @login_required('admin')
 def admin_dashboard():
-
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-
-    cur.execute("SELECT COUNT(*) FROM patients")
-    total_patients = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM doctors")
-    total_doctors = cur.fetchone()[0]
-
-    cur.execute("SELECT COUNT(*) FROM appointments")
-    total_appointments = cur.fetchone()[0]
-
-    conn.close()
+    total_patients = db_fetchone("SELECT COUNT(*) FROM patients")[0]
+    total_doctors = db_fetchone("SELECT COUNT(*) FROM doctors")[0]
+    total_appointments = db_fetchone("SELECT COUNT(*) FROM appointments")[0]
 
     return render_template(
         'admin_dashboard.html',
@@ -252,30 +247,20 @@ def patient_dashboard():
 @app.route('/patients')
 @login_required('admin')
 def patients():
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("SELECT id, name, age, gender, disease FROM patients")
-    data = cur.fetchall()
-    conn.close()
+    data = db_fetchall("SELECT id, name, age, gender, disease FROM patients")
     return render_template('patients.html', patients=data)
 
 
 @app.route('/doctors')
 @login_required('admin')
 def doctors():
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("SELECT id, name, age, gender, specialization FROM doctors")
-    data = cur.fetchall()
-    conn.close()
+    data = db_fetchall("SELECT id, name, age, gender, specialization FROM doctors")
     return render_template('doctors.html', doctors=data)
 
 
 @app.route('/appointments')
 @login_required()
 def appointments():
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
     role = session.get('role')
 
     query = """
@@ -286,14 +271,19 @@ def appointments():
     """
 
     if role == 'patient':
-        cur.execute(query + " WHERE a.patient_id = %s ORDER BY a.is_emergency DESC, a.date ASC", (session['ref_id'],))
+        rows = db_fetchall(
+            query + " WHERE a.patient_id = :ref_id ORDER BY a.is_emergency DESC, a.date ASC",
+            {"ref_id": session['ref_id']}
+        )
     elif role == 'doctor':
-        cur.execute(query + " WHERE a.doctor_id = %s ORDER BY a.is_emergency DESC, a.date ASC", (session['ref_id'],))
+        rows = db_fetchall(
+            query + " WHERE a.doctor_id = :ref_id ORDER BY a.is_emergency DESC, a.date ASC",
+            {"ref_id": session['ref_id']}
+        )
     else:
-        cur.execute(query + " ORDER BY a.is_emergency DESC, a.date ASC")
-
-    rows = cur.fetchall()
-    conn.close()
+        rows = db_fetchall(
+            query + " ORDER BY a.is_emergency DESC, a.date ASC"
+        )
 
     data = []
     for r in rows:
@@ -312,25 +302,35 @@ def patient_book():
         disease = request.form.get('disease')
         mobile = request.form.get('mobile')
         patient_id = session['ref_id']
-
         is_emergency = 1 if request.form.get('emergency') else 0
 
         if not date or not disease or not mobile:
             flash("All fields are required!", "error")
             return redirect('/patient/book')
 
-        conn = get_db()
-        cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-        cur.execute("""
-            INSERT INTO appointments(patient_id, date, disease, mobile, status, is_emergency)
-            VALUES(%s, %s, %s, %s, 'Pending', %s)
-        """, (patient_id, date, disease, mobile, is_emergency))
+        try:
+            db.session.execute(
+                text("""
+                    INSERT INTO appointments(patient_id, date, disease, mobile, status, is_emergency)
+                    VALUES(:patient_id, :date, :disease, :mobile, 'Pending', :is_emergency)
+                """),
+                {
+                    "patient_id": patient_id,
+                    "date": date,
+                    "disease": disease,
+                    "mobile": mobile,
+                    "is_emergency": is_emergency
+                }
+            )
+            db.session.commit()
 
-        conn.commit()
-        conn.close()
+            flash("Appointment booked successfully!", "success")
+            return redirect('/appointments')
 
-        flash("Appointment booked successfully!", "success")
-        return redirect('/appointments')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Booking failed: {e}", "error")
+            return redirect('/patient/book')
 
     return render_template('patient_book.html')
 
@@ -342,15 +342,11 @@ def confirm_appointment():
     doctor_id = request.form.get('doctor_id')
     time = request.form.get('time')
 
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("""
+    db_execute("""
         UPDATE appointments
-        SET doctor_id=%s, time=%s, status='Confirmed'
-        WHERE id=%s
-    """, (doctor_id, time, appointment_id))
-    conn.commit()
-    conn.close()
+        SET doctor_id=:doctor_id, time=:time, status='Confirmed'
+        WHERE id=:appointment_id
+    """, {"doctor_id": doctor_id, "time": time, "appointment_id": appointment_id})
 
     return redirect('/appointments')
 
@@ -366,26 +362,34 @@ def add_doctor():
     username = request.form.get('username')
     password = generate_password_hash(request.form.get('password'))
 
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
+    try:
+        db.session.execute(
+            text("""
+                INSERT INTO doctors(name, age, gender, specialization)
+                VALUES(:name, :age, :gender, :specialization)
+            """),
+            {"name": name, "age": age, "gender": gender, "specialization": specialization}
+        )
 
-    cur.execute("""
-        INSERT INTO doctors(name, age, gender, specialization)
-        VALUES(%s, %s, %s, %s)
-    """, (name, age, gender, specialization))
+        doctor_id = db.session.execute(text("SELECT LAST_INSERT_ID()")).scalar_one()
 
-    doctor_id = cur.lastrowid
+        db.session.execute(
+            text("""
+                INSERT INTO users(username, password, role, ref_id)
+                VALUES(:username, :password, 'doctor', :ref_id)
+            """),
+            {"username": username, "password": password, "ref_id": doctor_id}
+        )
 
-    cur.execute("""
-        INSERT INTO users(username, password, role, ref_id)
-        VALUES(%s, %s, 'doctor', %s)
-    """, (username, password, doctor_id))
+        db.session.commit()
 
-    conn.commit()
-    conn.close()
+        flash(f"Doctor added! Login username: {username}, password: 1234", "success")
+        return redirect('/doctors')
 
-    flash(f"Doctor added! Login username: {username}, password: 1234", "success")
-    return redirect('/doctors')
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Doctor add failed: {e}", "error")
+        return redirect('/doctors')
 
 
 @app.route('/doctor/complete', methods=['POST'])
@@ -393,15 +397,11 @@ def add_doctor():
 def complete_appointment():
     appointment_id = request.form.get('id')
 
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("""
+    db_execute("""
         UPDATE appointments
         SET status = 'Completed'
-        WHERE id = %s
-    """, (appointment_id,))
-    conn.commit()
-    conn.close()
+        WHERE id = :appointment_id
+    """, {"appointment_id": appointment_id})
 
     flash("Marked as completed!", "success")
     return redirect('/appointments')
@@ -413,16 +413,10 @@ def cancel_appointment():
     appointment_id = request.form.get('id')
     patient_id = session.get('ref_id')
 
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-
-    cur.execute("""
+    db_execute("""
         DELETE FROM appointments
-        WHERE id = %s AND patient_id = %s AND status = 'Pending'
-    """, (appointment_id, patient_id))
-
-    conn.commit()
-    conn.close()
+        WHERE id = :appointment_id AND patient_id = :patient_id AND status = 'Pending'
+    """, {"appointment_id": appointment_id, "patient_id": patient_id})
 
     flash("Appointment cancelled!", "success")
     return redirect('/appointments')
@@ -431,12 +425,7 @@ def cancel_appointment():
 @app.route('/delete_doctor/<int:id>')
 @login_required('admin')
 def delete_doctor(id):
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("DELETE FROM doctors WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
+    db_execute("DELETE FROM doctors WHERE id=:id", {"id": id})
     flash("Doctor deleted successfully!", "success")
     return redirect('/doctors')
 
@@ -444,9 +433,6 @@ def delete_doctor(id):
 @app.route('/update_doctor/<int:id>', methods=['GET', 'POST'])
 @login_required('admin')
 def update_doctor(id):
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-
     if request.method == 'POST':
         name = request.form.get('name')
         specialization = request.form.get('specialization')
@@ -457,39 +443,47 @@ def update_doctor(id):
 
         age = int(age) if age else None
 
-        cur.execute("""
-            UPDATE doctors
-            SET name=%s, specialization=%s, age=%s, gender=%s
-            WHERE id=%s
-        """, (name, specialization, age, gender, id))
+        try:
+            db.session.execute(
+                text("""
+                    UPDATE doctors
+                    SET name=:name, specialization=:specialization, age=:age, gender=:gender
+                    WHERE id=:id
+                """),
+                {"name": name, "specialization": specialization, "age": age, "gender": gender, "id": id}
+            )
 
-        if password:
-            hashed_password = generate_password_hash(password)
-            cur.execute("""
-                UPDATE users
-                SET username=%s, password=%s
-                WHERE ref_id=%s AND role='doctor'
-            """, (username, hashed_password, id))
-        else:
-            cur.execute("""
-                UPDATE users
-                SET username=%s
-                WHERE ref_id=%s AND role='doctor'
-            """, (username, id))
+            if password:
+                hashed_password = generate_password_hash(password)
+                db.session.execute(
+                    text("""
+                        UPDATE users
+                        SET username=:username, password=:password
+                        WHERE ref_id=:ref_id AND role='doctor'
+                    """),
+                    {"username": username, "password": hashed_password, "ref_id": id}
+                )
+            else:
+                db.session.execute(
+                    text("""
+                        UPDATE users
+                        SET username=:username
+                        WHERE ref_id=:ref_id AND role='doctor'
+                    """),
+                    {"username": username, "ref_id": id}
+                )
 
-        conn.commit()
-        conn.close()
+            db.session.commit()
+            flash("Doctor updated successfully!", "success")
+            return redirect('/doctors')
 
-        flash("Doctor updated successfully!", "success")
-        return redirect('/doctors')
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Update failed: {e}", "error")
+            return redirect('/doctors')
 
-    cur.execute("SELECT * FROM doctors WHERE id=%s", (id,))
-    doctor = cur.fetchone()
-
-    cur.execute("SELECT username FROM users WHERE ref_id=%s AND role='doctor'", (id,))
-    user = cur.fetchone()
-
-    conn.close()
+    doctor = db_fetchone("SELECT * FROM doctors WHERE id=:id", {"id": id})
+    user = db_fetchone("SELECT username FROM users WHERE ref_id=:id AND role='doctor'", {"id": id})
 
     return render_template('update_doctor.html', doctor=doctor, user=user)
 
@@ -497,13 +491,7 @@ def update_doctor(id):
 @app.route('/delete_patient/<int:id>')
 @login_required('admin')
 def delete_patient(id):
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-
-    cur.execute("DELETE FROM patients WHERE id=%s", (id,))
-    conn.commit()
-    conn.close()
-
+    db_execute("DELETE FROM patients WHERE id=:id", {"id": id})
     flash("Patient deleted successfully!", "success")
     return redirect('/patients')
 
@@ -513,12 +501,7 @@ def delete_patient(id):
 def delete_appointment():
     appointment_id = request.form.get('id')
 
-    conn = get_db()
-    cur = conn.cursor(row_factory=psycopg.rows.dict_row)
-    cur.execute("DELETE FROM appointments WHERE id=%s", (appointment_id,))
-    conn.commit()
-    conn.close()
-
+    db_execute("DELETE FROM appointments WHERE id=:id", {"id": appointment_id})
     flash("Appointment deleted successfully!", "success")
     return redirect('/appointments')
 
@@ -530,4 +513,4 @@ def logout():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.getenv('PORT', 10000)))
+    app.run(debug=True, port=10000)

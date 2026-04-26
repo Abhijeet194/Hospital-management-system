@@ -29,6 +29,26 @@ body {
     background: linear-gradient(90deg, #0d6efd, #198754);
     box-shadow: 0 5px 20px rgba(0,0,0,0.15);
 }
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+}
+
+
+.navbar .nav-links {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap; 
+}
+
+
+.navbar a {
+    position: relative;
+    z-index: 2;
+    white-space: nowrap;
+}
 
 .navbar a {
     color: white !important;
@@ -443,6 +463,14 @@ body {
 .badge.bg-danger {
     background: linear-gradient(135deg, #dc3545, #a71d2a);
     font-weight: bold;
+}
+
+.nav-links {
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.navbar .container {
+    display: flex !important;
 }
 
 
